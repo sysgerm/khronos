@@ -1,13 +1,25 @@
 import requests
 
-## TODO: tor integration
-
 api_endpoint = "https://api.github.com/users/"
 api_repo = "https://api.github.com/repos/"
+
+print("[%] Setting up TOR")
+
+session = requests.session()
+proxies = {"http":"socks5h://localhost:9050","https":"socks5h://localhost:9050"}
+session.proxies.update(proxies)
+headers = {"User-Agent":"Mozilla/5.0 (platform; rv:gecko-version) Gecko/gecko-trail Firefox/firefox-version"}
+session.headers.update(headers)
+session.cookies.clear()
+
+ip = session.get("https://ident.me")
+print(f"[++] TOR IP: {ip.text}")
 
 def main():
     username = input("Target username: ")
     webhook = input("Webhook URL (optional): ")
+    
+    print("[_] Starting Recon")
 
     if username:
         user_info = get_user_info(username)
@@ -59,30 +71,37 @@ Created At: {user_info.get('created_at')}
 
 def send_webhook(webhook, user_info, email_info):
     ##  TODO: webhook message too long
-    print("Sending user info...")
-    data = { "content": f"```{user_info}```", "username":"Khronos" }
-    requests.post(webhook, json=data)
-    print("Sending email info...")
-    data = { "content": f"```{email_info}```", "username":"Khronos" }
-    requests.post(webhook, json=data)
+    try:
+        print("Sending user info...")
+        data = { "content": f"```{user_info}```", "username":"Khronos" }
+        session.post(webhook, json=data)
+        print("Sending email info...")
+        data = { "content": f"```{email_info}```", "username":"Khronos" }
+        session.post(webhook, json=data)
+    except requests.ConnectionError as e:
+        print(e)
+        return
 
 def get_user_info(username):
     try:
-        response = requests.get(f"{api_endpoint}{username}")
+        response = session.get(f"{api_endpoint}{username}")
         response.raise_for_status()
         user_info = response.json()
         return user_info
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching user info: {e}")
+    except requests.ConnectionError as e:
+        print(e)
+        return {} 
 
 def get_email_info(username):
-    user_and_emails = {}
     try:
-        response = requests.get(f"{api_endpoint}{username}/repos")
+        user_and_emails = {}
+        response = session.get(f"{api_endpoint}{username}/repos")
+        response.raise_for_status()
+
         repos = response.json()
         for repo in repos:
             print(f"Repository: {str(repo['name'])}")
-            repo_data = requests.get(f"{api_repo}{username}/{repo['name']}/commits")
+            repo_data = session.get(f"{api_repo}{username}/{repo['name']}/commits")
             for commit in repo_data.json():
                 author = str(commit["commit"]["author"]["name"])
                 email = str(commit["commit"]["author"]["email"])
@@ -94,9 +113,9 @@ def get_email_info(username):
                         if email not in user_and_emails[str(author)]:
                             user_and_emails[str(author)].append(str(email))
         return user_and_emails
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching email info: {e}")
+    except requests.ConnectionError as e:
+        print(e)
+        return {}
 
 if __name__ == "__main__":
     main()
