@@ -18,7 +18,7 @@ Y                  Y    Y                          Y
                                                                                       
 ```
 
-Github enumeration tool written in python.
+TOR routed github enumeration tool written in python.
 
 # Setup
 
